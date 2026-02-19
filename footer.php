@@ -14,7 +14,7 @@
     <script src="https://cdn.datatables.net/2.0.8/js/dataTables.bootstrap5.js"></script>
     
     <!-- 4. SweetAlert2 (Para notificaciones bonitas, reemplazando los 'alert') -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- (Eliminado: Se movió a header.php) -->
 
     <!-- (Script del menú lateral ELIMINADO) -->
 
