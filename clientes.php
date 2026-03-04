@@ -1,5 +1,5 @@
-<?php 
-require 'header.php'; 
+<?php
+require 'header.php';
 ?>
 
 <!-- Contenido principal -->
@@ -40,9 +40,12 @@ require 'header.php';
                             echo "<td>" . htmlspecialchars($row['nombre']) . "</td>";
                             echo "<td>" . htmlspecialchars($row['celular']) . "</td>";
                             echo "<td>" . htmlspecialchars($row['direccion']) . "</td>";
-                            
+
                             // Botones de acción
                             echo "<td>
+                                    <a href='ficha_cliente.php?id=" . $row['id'] . "' class='btn btn-secondary btn-sm' title='Ver Ficha'>
+                                        <i class='bi bi-person-lines-fill'></i>
+                                    </a>
                                     <button class='btn btn-warning btn-sm btnEditar' data-id='" . $row['id'] . "' title='Editar'>
                                         <i class='bi bi-pencil'></i>
                                     </button>
@@ -73,7 +76,7 @@ require 'header.php';
                     <!-- Campos ocultos -->
                     <input type="hidden" id="id_cliente" name="id_cliente" value="0">
                     <input type="hidden" id="accion" name="accion" value="crear">
-                    
+
                     <div class="mb-3">
                         <label for="dni" class="form-label">DNI</label>
                         <input type="text" class="form-control" id="dni" name="dni" required>
@@ -88,7 +91,7 @@ require 'header.php';
                             <input type="text" class="form-control" id="nombre" name="nombre" required>
                         </div>
                     </div>
-                     <div class="mb-3">
+                    <div class="mb-3">
                         <label for="celular" class="form-label">Celular</label>
                         <input type="text" class="form-control" id="celular" name="celular">
                     </div>
@@ -100,7 +103,8 @@ require 'header.php';
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="submit" class="btn btn-primary" form="formCliente" id="btnGuardarCliente">Guardar Cliente</button>
+                <button type="submit" class="btn btn-primary" form="formCliente" id="btnGuardarCliente">Guardar
+                    Cliente</button>
             </div>
         </div>
     </div>
@@ -114,144 +118,144 @@ require 'header.php';
 
 <!-- 4. JavaScript Específico de la Página -->
 <script>
-$(document).ready(function() {
-    
-    // 1. Inicializar DataTables
-    // (Ahora $ y DataTable están definidos gracias al footer de arriba)
-    $('#tablaClientes').DataTable({
-        "language": {
-            // ---- ¡AQUÍ ESTÁ LA CORRECCIÓN! ----
-            // Añadimos "https:" para asegurar que la URL se resuelva correctamente
-            "url": "https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json"
-        }
-    });
+    $(document).ready(function () {
 
-    var modalCliente = new bootstrap.Modal($('#modalCliente'));
-
-    // 2. Abrir Modal para CREAR
-    $('#btnCrearCliente').click(function() {
-        $('#formCliente')[0].reset(); // Limpiar formulario
-        $('#id_cliente').val('0');    // Resetear ID
-        $('#accion').val('crear');     // Poner acción 'crear'
-        $('#modalLabelCliente').text('Crear Nuevo Cliente');
-        $('#btnGuardarCliente').text('Guardar Cliente');
-        modalCliente.show();
-    });
-
-    // 3. Abrir Modal para EDITAR
-    $('#tablaClientes').on('click', '.btnEditar', function() {
-        var idCliente = $(this).data('id');
-        
-        // Solicitar datos del cliente por AJAX (usando GET)
-        $.ajax({
-            url: 'gestionar_cliente.php',
-            type: 'GET',
-            data: { accion: 'obtener', id: idCliente },
-            dataType: 'json',
-            success: function(response) {
-                if (response.status === 'success') {
-                    // Llenar el formulario con los datos
-                    $('#id_cliente').val(response.data.id);
-                    $('#dni').val(response.data.dni);
-                    $('#apellido').val(response.data.apellido);
-                    $('#nombre').val(response.data.nombre);
-                    $('#celular').val(response.data.celular);
-                    $('#direccion').val(response.data.direccion);
-                    
-                    $('#accion').val('editar'); // Poner acción 'editar'
-                    $('#modalLabelCliente').text('Editar Cliente');
-                    $('#btnGuardarCliente').text('Actualizar Cliente');
-                    modalCliente.show();
-                } else {
-                    Swal.fire('Error', response.message, 'error');
-                }
-            },
-            error: function() {
-                Swal.fire('Error', 'Error al conectar con el servidor.', 'error');
+        // 1. Inicializar DataTables
+        // (Ahora $ y DataTable están definidos gracias al footer de arriba)
+        $('#tablaClientes').DataTable({
+            "language": {
+                // ---- ¡AQUÍ ESTÁ LA CORRECCIÓN! ----
+                // Añadimos "https:" para asegurar que la URL se resuelva correctamente
+                "url": "https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json"
             }
         });
-    });
 
-    // 4. Lógica de Submit (CREAR y EDITAR)
-    $('#formCliente').submit(function(e) {
-        e.preventDefault(); // Evitar envío normal
-        var formData = $(this).serialize(); // Obtener datos del form
-        
-        // Enviar datos por AJAX (usando POST)
-        $.ajax({
-            url: 'gestionar_cliente.php',
-            type: 'POST',
-            data: formData, // formData ya incluye la 'accion'
-            dataType: 'json',
-            success: function(response) {
-                if (response.status === 'success') {
-                    modalCliente.hide();
-                    Swal.fire({
-                        icon: 'success',
-                        title: '¡Éxito!',
-                        text: response.message,
-                        timer: 2000,
-                        showConfirmButton: false
-                    }).then(function() {
-                        location.reload(); // Recargar la página
-                    });
-                } else {
-                    // Mostrar error (ej: DNI duplicado)
-                    Swal.fire('Error', response.message, 'error');
-                }
-            },
-            error: function() {
-                Swal.fire('Error', 'Error al conectar con el servidor.', 'error');
-            }
+        var modalCliente = new bootstrap.Modal($('#modalCliente'));
+
+        // 2. Abrir Modal para CREAR
+        $('#btnCrearCliente').click(function () {
+            $('#formCliente')[0].reset(); // Limpiar formulario
+            $('#id_cliente').val('0');    // Resetear ID
+            $('#accion').val('crear');     // Poner acción 'crear'
+            $('#modalLabelCliente').text('Crear Nuevo Cliente');
+            $('#btnGuardarCliente').text('Guardar Cliente');
+            modalCliente.show();
         });
-    });
 
-    // 5. Lógica para ELIMINAR
-    $('#tablaClientes').on('click', '.btnEliminar', function() {
-        var idCliente = $(this).data('id');
-        
-        Swal.fire({
-            title: '¿Estás seguro?',
-            text: "¡No podrás revertir esto!",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Sí, ¡eliminar!',
-            cancelButtonText: 'Cancelar'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                // Enviar solicitud de eliminación por AJAX (usando POST)
-                $.ajax({
-                    url: 'gestionar_cliente.php',
-                    type: 'POST',
-                    data: { 
-                        accion: 'eliminar', 
-                        id_cliente: idCliente 
-                    },
-                    dataType: 'json',
-                    success: function(response) {
-                        if (response.status === 'success') {
-                            Swal.fire({
-                                icon: 'success',
-                                title: '¡Eliminado!',
-                                text: response.message,
-                                timer: 2000,
-                                showConfirmButton: false
-                            }).then(function() {
-                                location.reload();
-                            });
-                        } else {
-                            Swal.fire('Error', response.message, 'error');
-                        }
-                    },
-                    error: function() {
-                        Swal.fire('Error', 'Error al conectar con el servidor.', 'error');
+        // 3. Abrir Modal para EDITAR
+        $('#tablaClientes').on('click', '.btnEditar', function () {
+            var idCliente = $(this).data('id');
+
+            // Solicitar datos del cliente por AJAX (usando GET)
+            $.ajax({
+                url: 'gestionar_cliente.php',
+                type: 'GET',
+                data: { accion: 'obtener', id: idCliente },
+                dataType: 'json',
+                success: function (response) {
+                    if (response.status === 'success') {
+                        // Llenar el formulario con los datos
+                        $('#id_cliente').val(response.data.id);
+                        $('#dni').val(response.data.dni);
+                        $('#apellido').val(response.data.apellido);
+                        $('#nombre').val(response.data.nombre);
+                        $('#celular').val(response.data.celular);
+                        $('#direccion').val(response.data.direccion);
+
+                        $('#accion').val('editar'); // Poner acción 'editar'
+                        $('#modalLabelCliente').text('Editar Cliente');
+                        $('#btnGuardarCliente').text('Actualizar Cliente');
+                        modalCliente.show();
+                    } else {
+                        Swal.fire('Error', response.message, 'error');
                     }
-                });
-            }
+                },
+                error: function () {
+                    Swal.fire('Error', 'Error al conectar con el servidor.', 'error');
+                }
+            });
         });
-    });
 
-});
+        // 4. Lógica de Submit (CREAR y EDITAR)
+        $('#formCliente').submit(function (e) {
+            e.preventDefault(); // Evitar envío normal
+            var formData = $(this).serialize(); // Obtener datos del form
+
+            // Enviar datos por AJAX (usando POST)
+            $.ajax({
+                url: 'gestionar_cliente.php',
+                type: 'POST',
+                data: formData, // formData ya incluye la 'accion'
+                dataType: 'json',
+                success: function (response) {
+                    if (response.status === 'success') {
+                        modalCliente.hide();
+                        Swal.fire({
+                            icon: 'success',
+                            title: '¡Éxito!',
+                            text: response.message,
+                            timer: 2000,
+                            showConfirmButton: false
+                        }).then(function () {
+                            location.reload(); // Recargar la página
+                        });
+                    } else {
+                        // Mostrar error (ej: DNI duplicado)
+                        Swal.fire('Error', response.message, 'error');
+                    }
+                },
+                error: function () {
+                    Swal.fire('Error', 'Error al conectar con el servidor.', 'error');
+                }
+            });
+        });
+
+        // 5. Lógica para ELIMINAR
+        $('#tablaClientes').on('click', '.btnEliminar', function () {
+            var idCliente = $(this).data('id');
+
+            Swal.fire({
+                title: '¿Estás seguro?',
+                text: "¡No podrás revertir esto!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Sí, ¡eliminar!',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Enviar solicitud de eliminación por AJAX (usando POST)
+                    $.ajax({
+                        url: 'gestionar_cliente.php',
+                        type: 'POST',
+                        data: {
+                            accion: 'eliminar',
+                            id_cliente: idCliente
+                        },
+                        dataType: 'json',
+                        success: function (response) {
+                            if (response.status === 'success') {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: '¡Eliminado!',
+                                    text: response.message,
+                                    timer: 2000,
+                                    showConfirmButton: false
+                                }).then(function () {
+                                    location.reload();
+                                });
+                            } else {
+                                Swal.fire('Error', response.message, 'error');
+                            }
+                        },
+                        error: function () {
+                            Swal.fire('Error', 'Error al conectar con el servidor.', 'error');
+                        }
+                    });
+                }
+            });
+        });
+
+    });
 </script>

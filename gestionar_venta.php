@@ -26,18 +26,13 @@ if (is_null($data)) {
 $accion = $data['accion'] ?? '';
 
 if (empty($accion)) {
-    echo json_encode([
-        'status' => 'error', 
-        'message' => 'El servidor no recibió una acción válida.',
-        'debug_input' => $inputJSON,
-        'debug_request' => $_REQUEST 
-    ]);
+    echo json_encode(['status' => 'error', 'message' => 'El servidor no recibió una acción válida.']);
     exit();
 }
 
 try {
     switch ($accion) {
-        
+
         // --- ACCIÓN: BUSCAR ARTÍCULO ---
         case 'buscar_articulo':
             $query = $data['query'] ?? '';
@@ -51,20 +46,24 @@ try {
             $articulos = $stmt->fetchAll();
             $response = ['status' => 'success', 'data' => $articulos];
             break;
-            
+
         // --- ACCIÓN: OBTENER VENTA ---
         case 'obtener_venta':
-            $id = $data['id'] ?? 0;
-            
+            $id = (int) ($data['id'] ?? 0);
+            if ($id <= 0) {
+                $response['message'] = 'ID inválido.';
+                break;
+            }
+
             $stmt = $pdo->prepare("SELECT * FROM ventas WHERE id = ?");
             $stmt->execute([$id]);
             $venta = $stmt->fetch();
-            
+
             if (!$venta) {
                 $response['message'] = 'Venta no encontrada';
                 break;
             }
-            
+
             $stmt_det = $pdo->prepare("
                 SELECT 
                     dv.id_articulo AS id,
@@ -79,13 +78,13 @@ try {
             ");
             $stmt_det->execute([$id]);
             $detalles = $stmt_det->fetchAll();
-            
+
             foreach ($detalles as &$item) {
                 $item['stock_max'] = $item['stock_actual'] + $item['cantidad'];
             }
 
             $response = [
-                'status' => 'success', 
+                'status' => 'success',
                 'data' => [
                     'venta' => $venta,
                     'detalles' => $detalles
@@ -95,7 +94,7 @@ try {
 
         // --- ACCIÓN: ELIMINAR VENTA (¡NUEVO!) ---
         case 'eliminar_venta':
-            $id_venta = $data['id'] ?? 0;
+            $id_venta = (int) ($data['id'] ?? 0);
 
             if ($id_venta <= 0) {
                 throw new Exception("ID de venta no válido.");
@@ -130,14 +129,17 @@ try {
 
         // --- ACCIÓN: EDITAR VENTA ---
         case 'editar_venta':
-            $id_venta = $data['id_venta'];
+            $id_venta = (int) ($data['id_venta'] ?? 0);
+            if ($id_venta <= 0)
+                throw new Exception('ID de venta inválido.');
             $id_cliente = $data['id_cliente'];
             $tipo_pago = $data['tipo_pago'];
             $total_venta = $data['total'];
             $descuento_porcentaje = isset($data['descuento']) ? floatval($data['descuento']) : 0;
             $carrito = $data['carrito'] ?? [];
 
-            if (empty($carrito)) throw new Exception('El carrito no puede estar vacío.');
+            if (empty($carrito))
+                throw new Exception('El carrito no puede estar vacío.');
 
             $pdo->beginTransaction();
 
@@ -146,7 +148,8 @@ try {
             $stmt_old->execute([$id_venta]);
             $items_anteriores = $stmt_old->fetchAll();
             $stmt_ret = $pdo->prepare("UPDATE articulos SET stock_actual = stock_actual + ? WHERE id = ?");
-            foreach ($items_anteriores as $old) $stmt_ret->execute([$old['cantidad'], $old['id_articulo']]);
+            foreach ($items_anteriores as $old)
+                $stmt_ret->execute([$old['cantidad'], $old['id_articulo']]);
 
             // Borrar detalle anterior
             $pdo->prepare("DELETE FROM detalle_venta WHERE id_venta = ?")->execute([$id_venta]);
@@ -158,7 +161,8 @@ try {
             foreach ($carrito as $item) {
                 $stmt_det->execute([$id_venta, $item['id'], $item['cantidad'], $item['precio'], $item['precio']]);
                 $stmt_take->execute([$item['cantidad'], $item['id'], $item['cantidad']]);
-                if ($stmt_take->rowCount() === 0) throw new Exception('Stock insuficiente para: ' . $item['descripcion']);
+                if ($stmt_take->rowCount() === 0)
+                    throw new Exception('Stock insuficiente para: ' . $item['descripcion']);
             }
 
             // Actualizar cabecera
@@ -181,12 +185,14 @@ try {
         case 'procesar_venta':
             $id_cliente = $data['id_cliente'];
             $tipo_pago = $data['tipo_pago'];
-            $total_venta = $data['total']; 
+            $total_venta = $data['total'];
             $descuento_porcentaje = isset($data['descuento']) ? floatval($data['descuento']) : 0;
             $carrito = $data['carrito'] ?? [];
-            if (is_string($carrito)) $carrito = json_decode($carrito, true);
+            if (is_string($carrito))
+                $carrito = json_decode($carrito, true);
 
-            if (empty($carrito)) throw new Exception('El carrito está vacío.');
+            if (empty($carrito))
+                throw new Exception('El carrito está vacío.');
 
             $pdo->beginTransaction();
             $saldo_pendiente = ($tipo_pago == 'Cuenta Corriente') ? $total_venta : 0;
@@ -201,7 +207,8 @@ try {
             foreach ($carrito as $item) {
                 $stmt_det->execute([$id_venta_nueva, $item['id'], $item['cantidad'], $item['precio'], $item['precio']]);
                 $stmt_upd_stk->execute([$item['cantidad'], $item['id'], $item['cantidad']]);
-                if ($stmt_upd_stk->rowCount() === 0) throw new Exception('Stock insuficiente: ' . $item['descripcion']);
+                if ($stmt_upd_stk->rowCount() === 0)
+                    throw new Exception('Stock insuficiente: ' . $item['descripcion']);
             }
 
             if ($tipo_pago != 'Cuenta Corriente') {
@@ -210,9 +217,9 @@ try {
             }
 
             $pdo->commit();
-            $response = ['status' => 'success', 'message' => 'Venta registrada exitosamente (ID: ' . $id_venta_nueva . ')'];
+            $response = ['status' => 'success', 'message' => 'Venta registrada exitosamente (ID: ' . $id_venta_nueva . ')', 'id_venta' => (int) $id_venta_nueva];
             break;
-        
+
         default:
             $response['message'] = 'Acción desconocida: [' . htmlspecialchars($accion) . ']';
             break;

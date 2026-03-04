@@ -7,20 +7,21 @@ $password = 'dusuGO38fi'; // Tu contraseña de MySQL
 
 // Opciones de PDO
 $options = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, // Activa los errores
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, // Activa los errores
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,       // Devuelve resultados como array asociativo
-    PDO::ATTR_EMULATE_PREPARES   => false,                  // Desactiva la emulación de consultas preparadas
+    PDO::ATTR_EMULATE_PREPARES => false,                  // Desactiva la emulación de consultas preparadas
 ];
 
 try {
     // Crear una nueva instancia de PDO
     $pdo = new PDO("mysql:host=$host;dbname=$db_name;charset=utf8mb4", $username, $password, $options);
-    
+
     // Descomenta la siguiente línea si quieres verificar la conexión al cargar
     // echo "Conexión a la base de datos exitosa.";
 
 } catch (PDOException $e) {
-    // Manejar errores de conexión
-    die("Error de conexión: " . $e->getMessage());
+    // Loguear el error real sin exponerlo al usuario
+    error_log("DB Connection Error: " . $e->getMessage());
+    die("Error: No se pudo conectar a la base de datos. Contacte al administrador del sistema.");
 }
 ?>

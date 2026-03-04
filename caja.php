@@ -1,5 +1,5 @@
-<?php 
-require 'header.php'; 
+<?php
+require 'header.php';
 
 // --- 1. Obtener fechas del filtro ---
 $fecha_desde = $_GET['fecha_desde'] ?? date('Y-m-01'); // Primer día del mes actual por defecto
@@ -82,10 +82,11 @@ $total_cta_generada = $stmt_ventas_cta->fetchColumn();
         </div>
         <div class="d-flex gap-2">
             <!-- Botones de Acción -->
-            <a href="caja_print.php?fecha_desde=<?php echo $fecha_desde; ?>&fecha_hasta=<?php echo $fecha_hasta; ?>" target="_blank" class="btn btn-outline-secondary">
+            <a href="caja_print.php?fecha_desde=<?php echo $fecha_desde; ?>&fecha_hasta=<?php echo $fecha_hasta; ?>"
+                target="_blank" class="btn btn-outline-secondary">
                 <i class="bi bi-printer me-2"></i>Imprimir
             </a>
-            
+
             <button id="btnEgresoManual" class="btn btn-danger">
                 <i class="bi bi-dash-circle me-2"></i>Registrar Egreso
             </button>
@@ -109,7 +110,7 @@ $total_cta_generada = $stmt_ventas_cta->fetchColumn();
                     </div>
                 </div>
                 <div class="col-md-3">
-                     <div class="input-group input-group-sm">
+                    <div class="input-group input-group-sm">
                         <span class="input-group-text">Hasta</span>
                         <input type="date" class="form-control" name="fecha_hasta" value="<?php echo $fecha_hasta; ?>">
                     </div>
@@ -120,7 +121,7 @@ $total_cta_generada = $stmt_ventas_cta->fetchColumn();
             </form>
         </div>
     </div>
-    
+
     <!-- 3. Tarjetas de Resumen (KPIs Mejorados) -->
     <div class="row g-3 mb-4">
         <!-- Saldo -->
@@ -161,7 +162,7 @@ $total_cta_generada = $stmt_ventas_cta->fetchColumn();
         <div class="col-lg-4 col-md-6">
             <div class="card shadow-sm border-0 border-start border-4 border-danger h-100">
                 <div class="card-body">
-                     <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h6 class="text-muted text-uppercase mb-1">Total Egresos</h6>
                             <h3 class="fw-bold text-danger mb-0">$<?php echo number_format($egresos_rango, 2); ?></h3>
@@ -170,37 +171,37 @@ $total_cta_generada = $stmt_ventas_cta->fetchColumn();
                             <i class="bi bi-arrow-down-square"></i>
                         </div>
                     </div>
-                     <small class="text-muted mt-2 d-block">Gastos + Salidas manuales</small>
+                    <small class="text-muted mt-2 d-block">Gastos + Salidas manuales</small>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <!-- Totales Desglosados (Mini Cards) -->
     <div class="row g-3 mb-4">
-         <div class="col-md-4">
+        <div class="col-md-4">
             <div class="p-3 bg-white rounded shadow-sm border d-flex align-items-center justify-content-between">
                 <div>
-                     <span class="text-muted small text-uppercase">Contado</span>
-                     <h5 class="fw-bold text-success mb-0">$<?php echo number_format($total_contado, 2); ?></h5>
+                    <span class="text-muted small text-uppercase">Contado</span>
+                    <h5 class="fw-bold text-success mb-0">$<?php echo number_format($total_contado, 2); ?></h5>
                 </div>
                 <i class="bi bi-cash text-success fs-3"></i>
             </div>
         </div>
-         <div class="col-md-4">
+        <div class="col-md-4">
             <div class="p-3 bg-white rounded shadow-sm border d-flex align-items-center justify-content-between">
                 <div>
-                     <span class="text-muted small text-uppercase">Transferencia</span>
-                     <h5 class="fw-bold text-secondary mb-0">$<?php echo number_format($total_transferencia, 2); ?></h5>
+                    <span class="text-muted small text-uppercase">Transferencia</span>
+                    <h5 class="fw-bold text-secondary mb-0">$<?php echo number_format($total_transferencia, 2); ?></h5>
                 </div>
                 <i class="bi bi-bank text-secondary fs-3"></i>
             </div>
         </div>
-         <div class="col-md-4">
+        <div class="col-md-4">
             <div class="p-3 bg-white rounded shadow-sm border d-flex align-items-center justify-content-between">
                 <div>
-                     <span class="text-muted small text-uppercase">Cta. Corriente</span>
-                     <h5 class="fw-bold text-warning mb-0">$<?php echo number_format($total_cta_generada, 2); ?></h5>
+                    <span class="text-muted small text-uppercase">Cta. Corriente</span>
+                    <h5 class="fw-bold text-warning mb-0">$<?php echo number_format($total_cta_generada, 2); ?></h5>
                 </div>
                 <i class="bi bi-credit-card text-warning fs-3"></i>
             </div>
@@ -251,7 +252,7 @@ $total_cta_generada = $stmt_ventas_cta->fetchColumn();
                             $badge_class = $es_ingreso ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-danger-subtle text-danger border border-danger-subtle';
                             $icon = $es_ingreso ? '<i class="bi bi-arrow-up-short"></i>' : '<i class="bi bi-arrow-down-short"></i>';
                             $signo = $es_ingreso ? '+' : '-';
-                            
+
                             echo "<tr>";
                             echo "<td class='ps-3 text-muted small'>#" . $row['id'] . "</td>";
                             echo "<td>" . date("d/m/Y H:i", strtotime($row['fecha'])) . "</td>";
@@ -280,12 +281,13 @@ $total_cta_generada = $stmt_ventas_cta->fetchColumn();
             <div class="modal-body">
                 <form id="formMovimientoManual">
                     <input type="hidden" id="accionCaja" name="accion" value="">
-                    
+
                     <div class="mb-3">
                         <label for="monto" class="form-label">Monto</label>
                         <div class="input-group">
                             <span class="input-group-text">$</span>
-                            <input type="number" class="form-control" id="monto" name="monto" step="0.01" min="0.01" required>
+                            <input type="number" class="form-control" id="monto" name="monto" step="0.01" min="0.01"
+                                required>
                         </div>
                     </div>
                     <div class="mb-3">
@@ -296,7 +298,8 @@ $total_cta_generada = $stmt_ventas_cta->fetchColumn();
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="submit" class="btn btn-primary" form="formMovimientoManual" id="btnGuardarMovimiento">Guardar Movimiento</button>
+                <button type="submit" class="btn btn-primary" form="formMovimientoManual"
+                    id="btnGuardarMovimiento">Guardar Movimiento</button>
             </div>
         </div>
     </div>
@@ -307,68 +310,70 @@ $total_cta_generada = $stmt_ventas_cta->fetchColumn();
 
 <!-- 6. JavaScript -->
 <script>
-$(document).ready(function() {
-    
-    // DataTables
-    $('#tablaCaja').DataTable({
-        "language": {
-            "url": "https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json"
-        },
-        "order": [[1, "desc"]] 
-    });
+    $(document).ready(function () {
 
-    var modalMovimientoManual = new bootstrap.Modal($('#modalMovimientoManual'));
-
-    // Abrir Ingreso
-    $('#btnIngresoManual').click(function() {
-        $('#formMovimientoManual')[0].reset();
-        $('#accionCaja').val('ingreso_manual');
-        $('#modalLabelCaja').text('Registrar Ingreso Manual');
-        $('#btnGuardarMovimiento').removeClass('btn-danger').addClass('btn-success').text('Registrar Ingreso');
-        modalMovimientoManual.show();
-    });
-
-    // Abrir Egreso
-    $('#btnEgresoManual').click(function() {
-        $('#formMovimientoManual')[0].reset();
-        $('#accionCaja').val('egreso_manual');
-        $('#modalLabelCaja').text('Registrar Egreso Manual');
-        $('#btnGuardarMovimiento').removeClass('btn-success').addClass('btn-danger').text('Registrar Egreso');
-        modalMovimientoManual.show();
-    });
-
-    // Submit Manual
-    $('#formMovimientoManual').submit(function(e) {
-        e.preventDefault();
-        var formData = $(this).serialize();
-        
-        $.ajax({
-            url: 'gestionar_caja.php',
-            type: 'POST',
-            data: formData,
-            dataType: 'json',
-            success: function(response) {
-                if (response.status === 'success') {
-                    modalMovimientoManual.hide();
-                    Swal.fire({
-                        icon: 'success',
-                        title: '¡Éxito!',
-                        text: response.message,
-                        timer: 2000,
-                        showConfirmButton: false
-                    }).then(function() {
-                        // Recargar manteniendo fechas
-                        window.location.search = window.location.search;
-                    });
-                } else {
-                    Swal.fire('Error', response.message, 'error');
-                }
+        // DataTables
+        $('#tablaCaja').DataTable({
+            "language": {
+                "url": "https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json"
             },
-            error: function() {
-                Swal.fire('Error', 'Error al conectar con el servidor.', 'error');
-            }
+            "order": [[1, "desc"]]
         });
-    });
 
-});
+        var modalMovimientoManual = new bootstrap.Modal($('#modalMovimientoManual'));
+
+        // Abrir Ingreso
+        $('#btnIngresoManual').click(function () {
+            $('#formMovimientoManual')[0].reset();
+            $('#accionCaja').val('ingreso_manual');
+            $('#modalLabelCaja').text('Registrar Ingreso Manual');
+            $('#btnGuardarMovimiento').removeClass('btn-danger').addClass('btn-success').text('Registrar Ingreso');
+            modalMovimientoManual.show();
+        });
+
+        // Abrir Egreso
+        $('#btnEgresoManual').click(function () {
+            $('#formMovimientoManual')[0].reset();
+            $('#accionCaja').val('egreso_manual');
+            $('#modalLabelCaja').text('Registrar Egreso Manual');
+            $('#btnGuardarMovimiento').removeClass('btn-success').addClass('btn-danger').text('Registrar Egreso');
+            modalMovimientoManual.show();
+        });
+
+        // Submit Manual
+        $('#formMovimientoManual').submit(function (e) {
+            e.preventDefault();
+            var formData = $(this).serialize();
+            // Deshabilitar botón para evitar doble envío
+            $('#btnGuardarMovimiento').prop('disabled', true).text('Guardando...');
+
+            $.ajax({
+                url: 'gestionar_caja.php',
+                type: 'POST',
+                data: formData,
+                dataType: 'json',
+                success: function (response) {
+                    if (response.status === 'success') {
+                        modalMovimientoManual.hide();
+                        Swal.fire({
+                            icon: 'success',
+                            title: '¡Éxito!',
+                            text: response.message,
+                            timer: 2000,
+                            showConfirmButton: false
+                        }).then(function () {
+                            location.reload(); // Recargar manteniendo URL actual
+                        });
+                    } else {
+                        Swal.fire('Error', response.message, 'error');
+                        $('#btnGuardarMovimiento').prop('disabled', false).text('Guardar Movimiento');
+                    }
+                },
+                error: function () {
+                    Swal.fire('Error', 'Error al conectar con el servidor.', 'error');
+                }
+            });
+        });
+
+    });
 </script>

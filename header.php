@@ -188,7 +188,10 @@ $pagina_actual = basename($_SERVER['PHP_SELF']);
             <div class="collapse navbar-collapse" id="navegacionPrincipal">
                 <ul class="navbar-nav mx-auto mb-2 mb-lg-0">
                     <li class="nav-item">
-                        <a class="nav-link <?php echo ($pagina_actual == 'index.php') ? 'active' : ''; ?>" href="index.php">Stock</a>
+                        <a class="nav-link <?php echo ($pagina_actual == 'index.php') ? 'active' : ''; ?>" href="index.php">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link <?php echo ($pagina_actual == 'stock.php') ? 'active' : ''; ?>" href="stock.php">Artículos</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link <?php echo ($pagina_actual == 'clientes.php') ? 'active' : ''; ?>" href="clientes.php">Clientes</a>
@@ -240,8 +243,9 @@ $pagina_actual = basename($_SERVER['PHP_SELF']);
                             <?php echo htmlspecialchars($_SESSION['nombre_usuario']); ?>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownUsuario">
-                            <!-- Aquí podríamos añadir "Cambiar Contraseña" en el futuro -->
-                            <li><a class="dropdown-item text-danger" href="logout.php">Cerrar Sesión</a></li>
+                            <li><a class="dropdown-item" href="usuarios.php"><i class="bi bi-people me-2"></i>Gestión de Usuarios</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="logout.php"><i class="bi bi-box-arrow-right me-2"></i>Cerrar Sesión</a></li>
                         </ul>
                     </li>
                 </ul>
