@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l /c/wamp64/www/diego/jd/*.php)",
+      "WebFetch(domain:codepen.io)",
+      "WebFetch(domain:cdpn.io)"
+    ]
+  }
+}

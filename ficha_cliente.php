@@ -31,21 +31,23 @@ $saldo_total = $stmt_saldo->fetchColumn() ?: 0;
 
 // 4. Obtener Historial (Ventas y Pagos unificados)
 $sql_historial = "
-    (SELECT 
+    (SELECT
         'Venta' as tipo,
         id as id_ref,
+        0 as id_venta_pago,
         fecha,
         total as debe,
         0.00 as haber,
         saldo_pendiente
-    FROM ventas 
+    FROM ventas
     WHERE id_cliente = ? AND tipo_pago = 'Cuenta Corriente')
-    
+
     UNION ALL
-    
-    (SELECT 
+
+    (SELECT
         'Pago' as tipo,
         p.id as id_ref,
+        p.id_venta as id_venta_pago,
         p.fecha,
         0.00 as debe,
         p.monto_pagado as haber,
@@ -53,7 +55,7 @@ $sql_historial = "
     FROM pagos_cta_corriente p
     JOIN ventas v ON p.id_venta = v.id
     WHERE v.id_cliente = ?)
-    
+
     ORDER BY fecha DESC
 ";
 $stmt_historial = $pdo->prepare($sql_historial);
@@ -133,7 +135,8 @@ $deudas_pendientes = $stmt_pendientes->fetchAll();
                                     <th>Concepto</th>
                                     <th class="text-end text-danger">Debe (Compra)</th>
                                     <th class="text-end text-success">Haber (Pago)</th>
-                                    <th class="text-end pe-4">Estado / Saldo</th>
+                                    <th class="text-end">Estado / Saldo</th>
+                                    <th class="pe-4" style="width:60px;"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -165,7 +168,7 @@ $deudas_pendientes = $stmt_pendientes->fetchAll();
                                         <td class="text-end text-success">
                                             <?php echo !$es_venta ? '$' . number_format($mov['haber'], 2) : '-'; ?>
                                         </td>
-                                        <td class="text-end pe-4">
+                                        <td class="text-end">
                                             <?php if ($es_venta): ?>
                                                 <?php if ($mov['saldo_pendiente'] > 0.01): ?>
                                                     <span class="text-danger fw-bold">Debe: $<?php echo number_format($mov['saldo_pendiente'], 2); ?></span>
@@ -174,6 +177,17 @@ $deudas_pendientes = $stmt_pendientes->fetchAll();
                                                 <?php endif; ?>
                                             <?php else: ?>
                                                 <span class="text-muted">-</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="pe-4 text-center">
+                                            <?php if (!$es_venta): ?>
+                                                <button class="btn btn-sm btn-outline-danger btn-eliminar-pago"
+                                                    title="Eliminar pago"
+                                                    data-id="<?= $mov['id_ref'] ?>"
+                                                    data-monto="<?= number_format($mov['haber'], 2) ?>"
+                                                    data-id-venta="<?= $mov['id_venta_pago'] ?>">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
@@ -259,6 +273,39 @@ $(document).ready(function() {
             $('#monto_pagado').val('');
             $('#saldoHelp').text('Seleccione una venta para ver el saldo máximo.');
         }
+    });
+
+    // Eliminar pago
+    $(document).on('click', '.btn-eliminar-pago', function () {
+        const id       = $(this).data('id');
+        const monto    = $(this).data('monto');
+        const idVenta  = $(this).data('id-venta');
+        Swal.fire({
+            title: '¿Eliminar pago?',
+            html: `Monto: <strong>$${monto}</strong><br><small class="text-muted">Se revertirá el saldo de la venta #${idVenta} y el movimiento de caja.</small>`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonText: 'Cancelar',
+            confirmButtonText: 'Sí, eliminar'
+        }).then(result => {
+            if (!result.isConfirmed) return;
+            $.ajax({
+                url: 'gestionar_pago_cta_corriente.php',
+                type: 'POST',
+                data: { accion: 'eliminar_pago', id_pago: id },
+                dataType: 'json',
+                success: function (res) {
+                    if (res.status === 'success') {
+                        Swal.fire({ icon: 'success', title: 'Pago eliminado', text: res.message, timer: 1800, showConfirmButton: false })
+                            .then(() => location.reload());
+                    } else {
+                        Swal.fire('Error', res.message, 'error');
+                    }
+                },
+                error: () => Swal.fire('Error', 'Error de conexión', 'error')
+            });
+        });
     });
 
     // Enviar formulario de pago

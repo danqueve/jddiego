@@ -19,6 +19,57 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit();
 }
 
+$accion = $_POST['accion'] ?? 'registrar_pago';
+
+// ── ELIMINAR PAGO ──────────────────────────────────────────
+if ($accion === 'eliminar_pago') {
+    $id_pago = $_POST['id_pago'] ?? 0;
+    if ($id_pago <= 0) {
+        echo json_encode(['status' => 'error', 'message' => 'ID de pago inválido.']);
+        exit();
+    }
+    try {
+        $pdo->beginTransaction();
+
+        // 1. Obtener el pago
+        $stmt = $pdo->prepare("SELECT id_venta, monto_pagado FROM pagos_cta_corriente WHERE id = ?");
+        $stmt->execute([$id_pago]);
+        $pago = $stmt->fetch();
+
+        if (!$pago) {
+            throw new Exception("El pago no existe.");
+        }
+
+        // 2. Restaurar saldo_pendiente en la venta
+        $stmt = $pdo->prepare("UPDATE ventas SET saldo_pendiente = saldo_pendiente + ? WHERE id = ?");
+        $stmt->execute([$pago['monto_pagado'], $pago['id_venta']]);
+
+        // 3. Eliminar el movimiento de caja asociado (el más reciente que coincida)
+        $stmt = $pdo->prepare("
+            DELETE FROM movimientos_caja
+            WHERE tipo_movimiento = 'Ingreso'
+              AND id_venta_relacionada = ?
+              AND monto = ?
+              AND descripcion LIKE 'Pago Cta. Corriente%'
+            ORDER BY id DESC
+            LIMIT 1
+        ");
+        $stmt->execute([$pago['id_venta'], $pago['monto_pagado']]);
+
+        // 4. Eliminar el pago
+        $stmt = $pdo->prepare("DELETE FROM pagos_cta_corriente WHERE id = ?");
+        $stmt->execute([$id_pago]);
+
+        $pdo->commit();
+        echo json_encode(['status' => 'success', 'message' => 'Pago eliminado y saldo restaurado correctamente.']);
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        echo json_encode(['status' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+    }
+    exit();
+}
+
+// ── REGISTRAR PAGO ─────────────────────────────────────────
 // Recoger datos
 $id_venta = $_POST['id_venta'] ?? 0;
 $monto_pagado = $_POST['monto_pagado'] ?? 0;
