@@ -5,6 +5,16 @@
       "source": "vercel-labs/skills",
       "sourceType": "github",
       "computedHash": "645b891da1edbae76ab79c7b088d4e73397464f8396edaf773c0e01971ce75d6"
+    },
+    "php-pro": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "computedHash": "fa7822289e90a1bc2f814b125574a43a18e5bf9a7b0615e266f7c5f656c67c4e"
+    },
+    "sql-code-review": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "computedHash": "ae157a0eeaa4c4712e850e85d71d25f2a53168f94011f3a08b888424f41220ee"
     }
   }
 }

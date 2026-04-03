@@ -5,13 +5,15 @@ require 'db_connect.php';
 
 // 2. Seguridad: Verificar si el usuario está logueado
 if (!isset($_SESSION['usuario_id'])) {
-    die("Acceso denegado. Por favor, inicie sesión.");
+    header('Location: login.php');
+    exit();
 }
 
 // 3. Obtener ID del cliente (cast seguro a entero)
 $id_cliente = (int) ($_GET['id'] ?? 0);
 if ($id_cliente <= 0) {
-    die("ID de cliente no válido.");
+    header('Location: clientes.php?error=' . urlencode('ID de cliente no válido.'));
+    exit();
 }
 
 try {
@@ -21,7 +23,8 @@ try {
     $cliente = $stmt_cliente->fetch();
 
     if (!$cliente) {
-        die("Cliente no encontrado.");
+        header('Location: clientes.php?error=' . urlencode('Cliente no encontrado para impresión.'));
+        exit();
     }
 
     // 5. Calcular Saldo Total Pendiente
@@ -33,39 +36,34 @@ try {
     $stmt_saldo->execute([$id_cliente]);
     $saldo_total = $stmt_saldo->fetchColumn() ?: 0;
 
-    // 6. Obtener Historial (Ventas y Pagos unificados)
-    $sql_historial = "
-        (SELECT 
-            'Venta' as tipo,
-            id as id_ref,
-            fecha,
-            total as debe,
-            0.00 as haber,
-            saldo_pendiente
-        FROM ventas 
-        WHERE id_cliente = ? AND tipo_pago = 'Cuenta Corriente')
-        
-        UNION ALL
-        
-        (SELECT 
-            'Pago' as tipo,
-            p.id as id_ref,
+    // 6. Obtener Pagos Realizados
+    $stmt_pagos = $pdo->prepare("
+        SELECT
             p.fecha,
-            0.00 as debe,
             p.monto_pagado as haber,
-            0.00 as saldo_pendiente
+            p.id_venta as id_venta_pago
         FROM pagos_cta_corriente p
         JOIN ventas v ON p.id_venta = v.id
-        WHERE v.id_cliente = ?)
-        
-        ORDER BY fecha DESC, tipo ASC
-    ";
-    $stmt_historial = $pdo->prepare($sql_historial);
-    $stmt_historial->execute([$id_cliente, $id_cliente]);
-    $historial = $stmt_historial->fetchAll();
+        WHERE v.id_cliente = ?
+        ORDER BY p.fecha DESC
+    ");
+    $stmt_pagos->execute([$id_cliente]);
+    $pagos_realizados = $stmt_pagos->fetchAll();
+
+    // 7. Obtener Deuda Activa (Consumos)
+    $stmt_pendientes = $pdo->prepare("
+        SELECT id, fecha, total, saldo_pendiente 
+        FROM ventas 
+        WHERE id_cliente = ? AND tipo_pago = 'Cuenta Corriente' AND saldo_pendiente > 0.01
+        ORDER BY fecha ASC
+    ");
+    $stmt_pendientes->execute([$id_cliente]);
+    $deudas_pendientes = $stmt_pendientes->fetchAll();
 
 } catch (PDOException $e) {
-    die("Error al generar el reporte: " . $e->getMessage());
+    error_log("Error al generar el reporte PDF/Impresión (ID Cliente: $id_cliente): " . $e->getMessage());
+    header('Location: clientes.php?error=' . urlencode('Ocurrió un error al cargar los datos del reporte.'));
+    exit();
 }
 ?>
 <!DOCTYPE html>
@@ -236,66 +234,74 @@ try {
             </div>
         </div>
 
-        <!-- Tabla de Historial -->
-        <h5 class="fw-bold border-bottom pb-2 mb-3">Detalle de Movimientos</h5>
-        <table class="table table-striped table-bordered table-sm">
+        <!-- Sección 1: Consumos Pendientes -->
+        <h5 class="fw-bold border-bottom pb-2 mb-3 mt-4 text-danger-emphasis">Consumos Pendientes (Deuda Activa)</h5>
+        <table class="table table-striped table-bordered table-sm mb-4">
             <thead class="table-light text-center">
                 <tr>
-                    <th>Fecha</th>
-                    <th>Concepto</th>
-                    <th>Referencia</th>
-                    <th>Debe (Venta)</th>
-                    <th>Haber (Pago)</th>
-                    <th>Estado</th>
+                    <th style="width: 20%;">Fecha</th>
+                    <th style="width: 35%;">Comprobante</th>
+                    <th style="width: 20%;">Total Original</th>
+                    <th style="width: 25%;">Saldo Restante</th>
                 </tr>
             </thead>
             <tbody>
-                <?php if (empty($historial)): ?>
+                <?php if (empty($deudas_pendientes)): ?>
                     <tr>
-                        <td colspan="6" class="text-center py-4 text-muted">No hay movimientos registrados.</td>
+                        <td colspan="4" class="text-center py-4 text-success fw-bold">El cliente no registra deudas activas.</td>
                     </tr>
                 <?php else: ?>
-                    <?php foreach ($historial as $mov):
-                        $es_venta = $mov['tipo'] == 'Venta';
-                        ?>
+                    <?php 
+                    $suma_restante = 0;
+                    foreach ($deudas_pendientes as $deuda): 
+                        $suma_restante += $deuda['saldo_pendiente'];
+                    ?>
                         <tr>
-                            <td class="text-center"><?php echo date("d/m/Y H:i", strtotime($mov['fecha'])); ?></td>
-                            <td><?php echo htmlspecialchars($mov['tipo']); ?></td>
-                            <td class="text-center text-muted"><small>#<?php echo $mov['id_ref']; ?></small></td>
-
-                            <!-- Columna Debe (Ventas) -->
-                            <td class="text-end">
-                                <?php if ($es_venta): ?>
-                                    <span class="text-danger fw-bold">$<?php echo number_format($mov['debe'], 2); ?></span>
-                                <?php else: ?>
-                                    -
-                                <?php endif; ?>
-                            </td>
-
-                            <!-- Columna Haber (Pagos) -->
-                            <td class="text-end">
-                                <?php if (!$es_venta): ?>
-                                    <span class="text-success fw-bold">$<?php echo number_format($mov['haber'], 2); ?></span>
-                                <?php else: ?>
-                                    -
-                                <?php endif; ?>
-                            </td>
-
-                            <!-- Estado / Saldo de la venta específica -->
-                            <td class="text-end">
-                                <?php if ($es_venta): ?>
-                                    <?php if ($mov['saldo_pendiente'] > 0.01): ?>
-                                        <span class="text-danger fw-bold">Pend:
-                                            $<?php echo number_format($mov['saldo_pendiente'], 2); ?></span>
-                                    <?php else: ?>
-                                        <span class="text-success fw-bold">PAGADO</span>
-                                    <?php endif; ?>
-                                <?php else: ?>
-                                    <small class="text-muted">Imputado</small>
-                                <?php endif; ?>
-                            </td>
+                            <td class="text-center"><?php echo date("d/m/Y H:i", strtotime($deuda['fecha'])); ?></td>
+                            <td>Venta #<?php echo $deuda['id']; ?></td>
+                            <td class="text-end text-muted">$<?php echo number_format($deuda['total'], 2); ?></td>
+                            <td class="text-end text-danger fw-bold">$<?php echo number_format($deuda['saldo_pendiente'], 2); ?></td>
                         </tr>
                     <?php endforeach; ?>
+                    <tr class="table-light fw-bold">
+                        <td colspan="3" class="text-end">TOTAL DEUDA ACTIVA:</td>
+                        <td class="text-end text-danger fs-6">$<?php echo number_format($suma_restante, 2); ?></td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+
+        <!-- Sección 2: Historial de Pagos -->
+        <h5 class="fw-bold border-bottom pb-2 mb-3 mt-5 text-success-emphasis">Historial de Pagos Realizados</h5>
+        <table class="table table-striped table-bordered table-sm mb-4">
+            <thead class="table-light text-center">
+                <tr>
+                    <th style="width: 25%;">Fecha de Pago</th>
+                    <th style="width: 50%;">Aplicado A</th>
+                    <th style="width: 25%;">Monto Abonado</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($pagos_realizados)): ?>
+                    <tr>
+                        <td colspan="3" class="text-center py-4 text-muted">No se registran pagos en el historial.</td>
+                    </tr>
+                <?php else: ?>
+                    <?php 
+                    $suma_pagos = 0;
+                    foreach ($pagos_realizados as $pago): 
+                        $suma_pagos += $pago['haber'];
+                    ?>
+                        <tr>
+                            <td class="text-center"><?php echo date("d/m/Y H:i", strtotime($pago['fecha'])); ?></td>
+                            <td>Pago Imputado a Venta #<?php echo $pago['id_venta_pago']; ?></td>
+                            <td class="text-end text-success fw-bold">+$<?php echo number_format($pago['haber'], 2); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <tr class="table-light fw-bold">
+                        <td colspan="2" class="text-end text-muted">Total Abonado en el Historial:</td>
+                        <td class="text-end text-success">$<?php echo number_format($suma_pagos, 2); ?></td>
+                    </tr>
                 <?php endif; ?>
             </tbody>
         </table>

@@ -1,11 +1,10 @@
 <?php 
 require 'header.php'; 
 
-// 1. Obtener ID del cliente
-$id_cliente = $_GET['id'] ?? 0;
+// 1. Obtener ID del cliente (Casteo Estricto)
+$id_cliente = (int)($_GET['id'] ?? 0);
 if ($id_cliente <= 0) {
-    echo '<div class="container mt-5"><div class="alert alert-danger">Cliente no válido.</div></div>';
-    require 'footer.php';
+    echo "<script>window.location.href='clientes.php?error=" . urlencode("Cliente no válido.") . "';</script>";
     exit();
 }
 
@@ -15,10 +14,15 @@ $stmt_cliente->execute([$id_cliente]);
 $cliente = $stmt_cliente->fetch();
 
 if (!$cliente) {
-    echo '<div class="container mt-5"><div class="alert alert-danger">Cliente no encontrado.</div></div>';
-    require 'footer.php';
+    echo "<script>window.location.href='clientes.php?error=" . urlencode("Cliente no encontrado.") . "';</script>";
     exit();
 }
+
+// Generar Token CSRF para el modal de pagos
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$csrf_token = $_SESSION['csrf_token'];
 
 // 3. Calcular Saldo Total Pendiente
 $stmt_saldo = $pdo->prepare("
@@ -29,40 +33,22 @@ $stmt_saldo = $pdo->prepare("
 $stmt_saldo->execute([$id_cliente]);
 $saldo_total = $stmt_saldo->fetchColumn() ?: 0;
 
-// 4. Obtener Historial (Ventas y Pagos unificados)
-$sql_historial = "
-    (SELECT
-        'Venta' as tipo,
-        id as id_ref,
-        0 as id_venta_pago,
-        fecha,
-        total as debe,
-        0.00 as haber,
-        saldo_pendiente
-    FROM ventas
-    WHERE id_cliente = ? AND tipo_pago = 'Cuenta Corriente')
-
-    UNION ALL
-
-    (SELECT
-        'Pago' as tipo,
-        p.id as id_ref,
+// 4. Obtener Pagos Realizados (Historial de Pagos)
+$stmt_pagos = $pdo->prepare("
+    SELECT
+        p.id as id_pago,
         p.id_venta as id_venta_pago,
         p.fecha,
-        0.00 as debe,
-        p.monto_pagado as haber,
-        0.00 as saldo_pendiente
+        p.monto_pagado as haber
     FROM pagos_cta_corriente p
     JOIN ventas v ON p.id_venta = v.id
-    WHERE v.id_cliente = ?)
+    WHERE v.id_cliente = ?
+    ORDER BY p.fecha DESC
+");
+$stmt_pagos->execute([$id_cliente]);
+$pagos_realizados = $stmt_pagos->fetchAll();
 
-    ORDER BY fecha DESC
-";
-$stmt_historial = $pdo->prepare($sql_historial);
-$stmt_historial->execute([$id_cliente, $id_cliente]);
-$historial = $stmt_historial->fetchAll();
-
-// 5. NUEVO: Obtener lista de ventas pendientes para el modal de pago
+// 5. Deudas Pendientes (Consumos y Saldos a Favor de Saldo Pendiente > 0)
 $stmt_pendientes = $pdo->prepare("
     SELECT id, fecha, total, saldo_pendiente 
     FROM ventas 
@@ -99,9 +85,9 @@ $deudas_pendientes = $stmt_pendientes->fetchAll();
     <div class="row">
         <!-- Columna Izquierda: Datos del Cliente y Saldo -->
         <div class="col-md-4 mb-4">
-            <div class="card shadow-sm border-0 mb-4">
+            <div class="card shadow-sm border-0 mb-4 action-card" style="transition: transform 0.2s, box-shadow 0.2s;">
                 <div class="card-body text-center p-4">
-                    <div class="avatar-placeholder bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 80px; height: 80px; font-size: 2rem;">
+                    <div class="avatar-placeholder bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 80px; height: 80px; font-size: 2rem; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
                         <?php echo strtoupper(substr($cliente['nombre'], 0, 1)); ?>
                     </div>
                     <h4 class="fw-bold"><?php echo htmlspecialchars($cliente['nombre'] . ' ' . $cliente['apellido']); ?></h4>
@@ -111,7 +97,7 @@ $deudas_pendientes = $stmt_pendientes->fetchAll();
                 </div>
             </div>
 
-            <div class="card shadow-sm border-0 bg-danger-subtle">
+            <div class="card shadow-sm border-0 bg-danger-subtle action-card" style="transition: transform 0.2s, box-shadow 0.2s;">
                 <div class="card-body text-center p-4">
                     <h6 class="text-danger-emphasis mb-2">DEUDA TOTAL ACTUAL</h6>
                     <h1 class="display-4 fw-bold text-danger mb-0">$<?php echo number_format($saldo_total, 2); ?></h1>
@@ -120,11 +106,13 @@ $deudas_pendientes = $stmt_pendientes->fetchAll();
             </div>
         </div>
 
-        <!-- Columna Derecha: Historial de Movimientos -->
+        <!-- Columna Derecha: Tablas Desglosadas -->
         <div class="col-md-8">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-white border-bottom-0 py-3">
-                    <h5 class="mb-0 fw-bold"><i class="bi bi-clock-history me-2"></i>Historial de Movimientos</h5>
+            <!-- TABLA 1: Consumos Pendientes (Adeudado) -->
+            <div class="card shadow-sm border-0 mb-4 border-start border-danger border-4">
+                <div class="card-header bg-white border-bottom-0 py-3 d-flex align-items-center">
+                    <i class="bi bi-exclamation-circle text-danger me-2 fs-5"></i>
+                    <h5 class="mb-0 fw-bold text-danger-emphasis">Consumos Pendientes (Deuda Activa)</h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -132,63 +120,88 @@ $deudas_pendientes = $stmt_pendientes->fetchAll();
                             <thead class="table-light">
                                 <tr>
                                     <th class="ps-4">Fecha</th>
-                                    <th>Concepto</th>
-                                    <th class="text-end text-danger">Debe (Compra)</th>
-                                    <th class="text-end text-success">Haber (Pago)</th>
-                                    <th class="text-end">Estado / Saldo</th>
-                                    <th class="pe-4" style="width:60px;"></th>
+                                    <th>Comprobante</th>
+                                    <th class="text-end text-muted">Total Venta</th>
+                                    <th class="text-end text-danger fw-bold pe-4">Saldo Restante</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php if (empty($historial)): ?>
+                                <?php if (empty($deudas_pendientes)): ?>
                                     <tr>
-                                        <td colspan="5" class="text-center py-5 text-muted">Este cliente no tiene movimientos registrados.</td>
+                                        <td colspan="4" class="text-center py-4 text-success fw-bold">
+                                            <i class="bi bi-check-circle me-1"></i> El cliente no registra deudas activas.
+                                        </td>
                                     </tr>
                                 <?php else: ?>
-                                    <?php foreach ($historial as $mov): 
-                                        $es_venta = $mov['tipo'] == 'Venta';
-                                    ?>
+                                    <?php foreach ($deudas_pendientes as $deuda): ?>
                                     <tr>
                                         <td class="ps-4">
-                                            <span class="fw-bold d-block"><?php echo date("d/m/Y", strtotime($mov['fecha'])); ?></span>
-                                            <small class="text-muted"><?php echo date("H:i", strtotime($mov['fecha'])); ?> hs</small>
+                                            <span class="fw-bold d-block"><?php echo date("d/m/Y", strtotime($deuda['fecha'])); ?></span>
+                                            <small class="text-muted"><?php echo date("H:i", strtotime($deuda['fecha'])); ?> hs</small>
                                         </td>
                                         <td>
-                                            <?php if ($es_venta): ?>
-                                                <span class="badge bg-warning text-dark mb-1">Venta #<?php echo $mov['id_ref']; ?></span>
-                                                <br><small><a href="remito.php?id=<?php echo $mov['id_ref']; ?>" target="_blank" class="text-decoration-none">Ver Remito</a></small>
-                                            <?php else: ?>
-                                                <span class="badge bg-success mb-1">Pago</span>
-                                                <br><small class="text-muted">Ref. venta #<?php echo $mov['id_ref']; // En realidad id_ref aquí es ID del pago, en query compleja podríamos traer ID venta ?> </small>
-                                            <?php endif; ?>
+                                            <span class="badge bg-warning text-dark mb-1">Venta #<?php echo $deuda['id']; ?></span>
+                                            <br><small><a href="remito.php?id=<?php echo $deuda['id']; ?>" target="_blank" class="text-decoration-none">Ver Remito</a></small>
                                         </td>
-                                        <td class="text-end text-danger">
-                                            <?php echo $es_venta ? '$' . number_format($mov['debe'], 2) : '-'; ?>
+                                        <td class="text-end text-muted">
+                                            $<?php echo number_format($deuda['total'], 2); ?>
                                         </td>
-                                        <td class="text-end text-success">
-                                            <?php echo !$es_venta ? '$' . number_format($mov['haber'], 2) : '-'; ?>
+                                        <td class="text-end text-danger fw-bold pe-4">
+                                            $<?php echo number_format($deuda['saldo_pendiente'], 2); ?>
                                         </td>
-                                        <td class="text-end">
-                                            <?php if ($es_venta): ?>
-                                                <?php if ($mov['saldo_pendiente'] > 0.01): ?>
-                                                    <span class="text-danger fw-bold">Debe: $<?php echo number_format($mov['saldo_pendiente'], 2); ?></span>
-                                                <?php else: ?>
-                                                    <span class="badge bg-success-subtle text-success border border-success">PAGADO</span>
-                                                <?php endif; ?>
-                                            <?php else: ?>
-                                                <span class="text-muted">-</span>
-                                            <?php endif; ?>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TABLA 2: Historial de Pagos -->
+            <div class="card shadow-sm border-0 border-start border-success border-4">
+                <div class="card-header bg-white border-bottom-0 py-3 d-flex align-items-center">
+                    <i class="bi bi-receipt text-success me-2 fs-5"></i>
+                    <h5 class="mb-0 fw-bold text-success-emphasis">Historial de Pagos Realizados</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">Fecha de Pago</th>
+                                    <th>Aplicado A</th>
+                                    <th class="text-end text-success fw-bold">Monto Abonado</th>
+                                    <th class="pe-4 text-center" style="width:60px;">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($pagos_realizados)): ?>
+                                    <tr>
+                                        <td colspan="4" class="text-center py-4 text-muted">No se registran pagos en el historial.</td>
+                                    </tr>
+                                <?php else: ?>
+                                    <?php foreach ($pagos_realizados as $pago): ?>
+                                    <tr>
+                                        <td class="ps-4">
+                                            <span class="fw-bold d-block"><?php echo date("d/m/Y", strtotime($pago['fecha'])); ?></span>
+                                            <small class="text-muted"><?php echo date("H:i", strtotime($pago['fecha'])); ?> hs</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success mb-1">Pago Recibido</span>
+                                            <br><small class="text-muted">Imputado a Venta #<?php echo $pago['id_venta_pago']; ?></small>
+                                        </td>
+                                        <td class="text-end text-success fw-bold">
+                                            +$<?php echo number_format($pago['haber'], 2); ?>
                                         </td>
                                         <td class="pe-4 text-center">
-                                            <?php if (!$es_venta): ?>
-                                                <button class="btn btn-sm btn-outline-danger btn-eliminar-pago"
-                                                    title="Eliminar pago"
-                                                    data-id="<?= $mov['id_ref'] ?>"
-                                                    data-monto="<?= number_format($mov['haber'], 2) ?>"
-                                                    data-id-venta="<?= $mov['id_venta_pago'] ?>">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            <?php endif; ?>
+                                            <button class="btn btn-sm btn-outline-danger btn-eliminar-pago"
+                                                title="Revertir este pago"
+                                                data-id="<?php echo $pago['id_pago']; ?>"
+                                                data-monto="<?php echo number_format($pago['haber'], 2); ?>"
+                                                data-id-venta="<?php echo $pago['id_venta_pago']; ?>">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
@@ -213,6 +226,7 @@ $deudas_pendientes = $stmt_pendientes->fetchAll();
             <div class="modal-body p-4">
                 <form id="formRegistrarPago">
                     <input type="hidden" name="accion" value="registrar_pago">
+                    <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
                     
                     <div class="mb-3">
                         <label class="form-label">Seleccionar Deuda a Pagar</label>
@@ -343,3 +357,20 @@ $(document).ready(function() {
     });
 });
 </script>
+
+<style>
+.action-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+}
+.btn {
+    transition: all 0.2s ease-in-out;
+}
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+table.table-hover tbody tr {
+    transition: background-color 0.2s;
+}
+</style>
